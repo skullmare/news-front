@@ -17,3 +17,4 @@ npm run dev
 ```
 
 Настройки темы сохраняются в localStorage (`theme`). 
+
