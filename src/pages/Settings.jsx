@@ -97,15 +97,15 @@ export default function Settings() {
 	return (
 		<div className="space-y-6">
 			{/* Toast уведомления */}
-			<div className="fixed bottom-4 right-4 z-50 space-y-2">
+			<div className="fixed inset-0 flex flex-col items-center justify-center z-50 space-y-1 pointer-events-none">
 				{toasts.map((toast) => (
 					<div
 						key={toast.id}
-						className={`px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 ease-in-out ${
-							toast.type === 'error'
+						className={`px-3 py-1.5 rounded-md shadow-lg transform transition-all duration-300 ease-in-out pointer-events-auto 
+                       bg-opacity-20 backdrop-blur-sm text-xs max-w-[200px] text-center ${toast.type === 'error'
 								? 'bg-red-500 text-white'
 								: 'bg-green-500 text-white'
-						}`}
+							}`}
 					>
 						{toast.message}
 					</div>
