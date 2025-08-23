@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import PostCard from '../components/PostCard.jsx'
 import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
+import LoadingSpinner from '../components/LoadingSpinner'; // путь к вашему файлу
 import { NewsAPI } from '../lib/api.js'
+import { ArrowRepeat, Openai, Plus } from 'react-bootstrap-icons'
 
 export default function Home() {
 	const [posts, setPosts] = useState([])
@@ -11,6 +13,7 @@ export default function Home() {
 	const [confirm, setConfirm] = useState({ open: false, id: null, type: null })
 	const [promptModal, setPromptModal] = useState({ open: false, id: null, label: '', action: null })
 	const [toasts, setToasts] = useState([])
+	const [requestInProgress, setRequestInProgress] = useState(false) // Новое состояние для отслеживания выполнения запроса
 
 	// Состояние для модального окна добавления новости
 	const [addNewsModal, setAddNewsModal] = useState({ 
@@ -67,6 +70,7 @@ export default function Home() {
 	const [genPrompt, setGenPrompt] = useState('')
 
 	async function handleConfirm() {
+		setRequestInProgress(true) // Начало запроса
 		const { id, type } = confirm
 		try {
 			if (type === 'publish') {
@@ -87,10 +91,12 @@ export default function Home() {
 			showToast(errorMessage, 'error')
 		} finally {
 			setConfirm({ open: false, id: null, type: null })
+			setRequestInProgress(false) // Конец запроса
 		}
 	}
 
 	async function handlePromptModal(value) {
+		setRequestInProgress(true) // Начало запроса
 		const { id, action } = promptModal
 		try {
 			if (action === 'regen') {
@@ -104,10 +110,12 @@ export default function Home() {
 			showToast('Ошибка при перегенерации новости', 'error')
 		} finally {
 			setPromptModal({ open: false, id: null, label: '', action: null })
+			setRequestInProgress(false) // Конец запроса
 		}
 	}
 
 	async function handleGenerateNew() {
+		setRequestInProgress(true) // Начало запроса
 		try {
 			await NewsAPI.generatePost(genPrompt)
 			const data = await NewsAPI.listNews()
@@ -119,6 +127,7 @@ export default function Home() {
 		} finally {
 			setGenOpen(false)
 			setGenPrompt('')
+			setRequestInProgress(false) // Конец запроса
 		}
 	}
 
@@ -146,6 +155,7 @@ export default function Home() {
 	};
 
 	async function handleAddNew() {
+		setRequestInProgress(true) // Начало запроса
 		try {
 			const formData = new FormData();
 			formData.append('title', addNewsModal.title);
@@ -165,6 +175,8 @@ export default function Home() {
 		} catch (e) {
 			console.error(e);
 			showToast('Ошибка при добавлении новости', 'error');
+		} finally {
+			setRequestInProgress(false) // Конец запроса
 		}
 	}
 
@@ -201,11 +213,11 @@ export default function Home() {
 						className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" 
 						onClick={() => setAddNewsModal({ open: true, title: '', text: '', imgFile: null, imgPreview: null })}
 					>
-						Добавить новость
+						<Plus size={20}/> Новость
 					</button>
 				</div>
 				<div className="flex items-center gap-2 p-1">
-					<button className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => setGenOpen(true)}>Сгенерировать новость</button>
+					<button className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => setGenOpen(true)}><Openai size={16} />Ai</button>
 				</div>
 			</div>
 			{content}
@@ -213,19 +225,63 @@ export default function Home() {
 			<Modal open={confirm.open} title={confirm.type === 'publish' ? 'Опубликовать новость?' : 'Удалить новость?'} onClose={() => setConfirm({ open: false, id: null, type: null })}>
 				<p className="mb-4">Вы уверены?</p>
 				<div className="flex justify-end gap-2">
-					<button className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => setConfirm({ open: false, id: null, type: null })}>Отмена</button>
-					<button className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-white transition bg-green-600 hover:bg-green-700" onClick={handleConfirm}>Подтвердить</button>
+					<button 
+						className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed" 
+						onClick={() => setConfirm({ open: false, id: null, type: null })}
+						disabled={requestInProgress}
+					>
+						Отмена
+					</button>
+					<button 
+						className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-white transition bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed" 
+						onClick={handleConfirm}
+						disabled={requestInProgress}
+					>
+						{requestInProgress ? (
+							<>
+								<LoadingSpinner />
+								Загрузка...
+							</>
+						) : (
+							'Подтвердить'
+						)}
+					</button>
 				</div>
 			</Modal>
 
-			<PromptModal open={promptModal.open} title={promptModal.label} onSubmit={handlePromptModal} onClose={() => setPromptModal({ open: false, id: null, label: '', action: null })} />
+			<PromptModal 
+				open={promptModal.open} 
+				title={promptModal.label} 
+				onSubmit={handlePromptModal} 
+				onClose={() => setPromptModal({ open: false, id: null, label: '', action: null })}
+				requestInProgress={requestInProgress}
+			/>
 
 			<Modal open={genOpen} title="Сгенерировать новость" onClose={() => setGenOpen(false)}>
 				<div className="space-y-3">
 					<textarea className="w-full min-h-[100px] rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 p-3 outline-none" placeholder="Опишите, какую новость сгенерировать" value={genPrompt} onChange={(e) => setGenPrompt(e.target.value)} />
 					<div className="flex justify-end gap-2">
-						<button className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => setGenOpen(false)}>Отмена</button>
-						<button className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition" onClick={handleGenerateNew}>Сгенерировать</button>
+						<button 
+							className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed" 
+							onClick={() => setGenOpen(false)}
+							disabled={requestInProgress}
+						>
+							Отмена
+						</button>
+						<button 
+							className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" 
+							onClick={handleGenerateNew}
+							disabled={requestInProgress || !genPrompt.trim()}
+						>
+							{requestInProgress ? (
+								<>
+									<LoadingSpinner />
+									Генерация...
+								</>
+							) : (
+								'Сгенерировать'
+							)}
+						</button>
 					</div>
 				</div>
 			</Modal>
@@ -241,6 +297,7 @@ export default function Home() {
 							placeholder="Введите заголовок новости"
 							value={addNewsModal.title}
 							onChange={(e) => setAddNewsModal({...addNewsModal, title: e.target.value})}
+							disabled={requestInProgress}
 						/>
 					</div>
 					
@@ -251,6 +308,7 @@ export default function Home() {
 							placeholder="Введите текст новости"
 							value={addNewsModal.text}
 							onChange={(e) => setAddNewsModal({...addNewsModal, text: e.target.value})}
+							disabled={requestInProgress}
 						/>
 					</div>
 					
@@ -261,6 +319,7 @@ export default function Home() {
 							accept="image/*"
 							className="w-full rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 p-2 outline-none"
 							onChange={handleImageChange}
+							disabled={requestInProgress}
 						/>
 						{addNewsModal.imgPreview && (
 							<div className="mt-2 relative">
@@ -273,6 +332,7 @@ export default function Home() {
 									type="button"
 									className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
 									onClick={removeImage}
+									disabled={requestInProgress}
 								>
 									✕
 								</button>
@@ -282,17 +342,25 @@ export default function Home() {
 					
 					<div className="flex justify-end gap-2">
 						<button 
-							className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" 
+							className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed" 
 							onClick={() => setAddNewsModal({ open: false, title: '', text: '', imgFile: null, imgPreview: null })}
+							disabled={requestInProgress}
 						>
 							Отмена
 						</button>
 						<button 
 							className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" 
 							onClick={handleAddNew}
-							disabled={!addNewsModal.title.trim() || !addNewsModal.text.trim()}
+							disabled={requestInProgress || !addNewsModal.title.trim() || !addNewsModal.text.trim()}
 						>
-							Добавить
+							{requestInProgress ? (
+								<>
+									<LoadingSpinner />
+									Добавление...
+								</>
+							) : (
+								'Добавить'
+							)}
 						</button>
 					</div>
 				</div>
@@ -301,15 +369,40 @@ export default function Home() {
 	)
 }
 
-function PromptModal({ open, title, onSubmit, onClose }) {
+function PromptModal({ open, title, onSubmit, onClose, requestInProgress }) {
 	const [value, setValue] = useState('')
 	return (
 		<Modal open={open} title={title} onClose={onClose}>
 			<div className="space-y-3">
-				<textarea className="w-full min-h-[100px] rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 p-3 outline-none" placeholder="Опишите..." value={value} onChange={(e) => setValue(e.target.value)} />
+				<textarea 
+					className="w-full min-h-[100px] rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 p-3 outline-none" 
+					placeholder="Опишите..." 
+					value={value} 
+					onChange={(e) => setValue(e.target.value)}
+					disabled={requestInProgress}
+				/>
 				<div className="flex justify-end gap-2">
-					<button className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={onClose}>Отмена</button>
-					<button className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition" onClick={() => onSubmit(value)}>Продолжить</button>
+					<button 
+						className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed" 
+						onClick={onClose}
+						disabled={requestInProgress}
+					>
+						Отмена
+					</button>
+					<button 
+						className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed" 
+						onClick={() => onSubmit(value)}
+						disabled={requestInProgress || !value.trim()}
+					>
+						{requestInProgress ? (
+							<>
+								<LoadingSpinner />
+								Загрузка...
+							</>
+						) : (
+							'Продолжить'
+						)}
+					</button>
 				</div>
 			</div>
 		</Modal>
