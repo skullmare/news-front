@@ -1,14 +1,18 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChannelsAPI, SettingsAPI } from '../lib/api.js'
+import { ParsingAPI } from '../lib/api.js'
 import Modal from '../components/Modal.jsx'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { 
-  ArrowClockwise, 
-  Trash, 
-  Plus, 
-  Check, 
-  X 
+import AutoParsingToggle from '../components/AutoParsingToggle';
+import {
+  ArrowClockwise,
+  Trash,
+  Plus,
+  Check,
+  BrowserChrome,
+  Telegram,
+  X
 } from 'react-bootstrap-icons'
 
 // Кастомный хук для автоматического изменения высоты textarea
@@ -149,6 +153,58 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
+      {/* Панель управления парсингом */}
+      <div className="rounded-xl p-4 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex gap-2 w-full">
+          <button
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loadingSettings || savingSettings}
+            onClick={async () => {
+              try {
+                const res = await ParsingAPI.startSiteParsing()
+                if (res?.status === 'close') {
+                  showMessage('Парсинг уже запущен', 'error')
+                } else if (res?.status === 'ok') {
+                  showMessage('Парсинг завершился')
+                } else {
+                  showMessage('Неожиданный ответ сервера', 'error')
+                }
+              } catch (e) {
+                console.error(e)
+                showMessage('Ошибка запуска парсинга сайтов', 'error')
+              }
+            }}
+          >
+            <BrowserChrome size={35} /> Парсинг сайтов
+          </button>
+          <button
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loadingSettings || savingSettings}
+            onClick={async () => {
+              try {
+                const res = await ParsingAPI.startTgParsing()
+                if (res?.status === 'close') {
+                  showMessage('Парсинг уже запущен', 'error')
+                } else if (res?.status === 'ok') {
+                  showMessage('Парсинг завершился')
+                } else {
+                  showMessage('Неожиданный ответ сервера', 'error')
+                }
+              } catch (e) {
+                console.error(e)
+                showMessage('Ошибка запуска парсинга Telegram', 'error')
+              }
+            }}
+          >
+            <Telegram size={35} /> Парсинг Telegram
+          </button>
+          
+        </div>
+        <div className="flex">
+          {/* Переключатель автопарсинга */}
+          <AutoParsingToggle loadingSettings={loadingSettings} />
+        </div>
+      </div>
       {/* Центральное сообщение */}
       {message && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">

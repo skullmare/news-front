@@ -96,14 +96,19 @@ export default function PostAdd() {
     }
 
     async function handleGenerateTitle() {
-        if (!newsData.title.trim()) {
-            showMessage('Введите начальный заголовок для генерации', 'error')
+        // Если заголовок пустой, используем текст с префиксом
+        const sourceText = newsData.title.trim() 
+            ? newsData.title 
+            : `Сгенерируй заголовок на основе этого текста: ${newsData.text.trim()}`;
+        
+        if (!sourceText.trim()) {
+            showMessage('Введите текст для генерации заголовка', 'error')
             return
         }
 
         setGeneratingTitle(true)
         try {
-            const generatedTitle = await NewsAPI.generatePostTitle(newsData.title)
+            const generatedTitle = await NewsAPI.generatePostTitle(sourceText)
 
             // Обрабатываем ответ от сервера
             if (generatedTitle) {

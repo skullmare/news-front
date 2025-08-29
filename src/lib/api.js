@@ -143,4 +143,27 @@ export const ChannelsAPI = {
 		const { data } = await api.delete('/webhook/channel/delete', { data: toFormData({ id }) })
 		return data
 	},
+}
+
+export const ParsingAPI = {
+  startSiteParsing: async () => {
+    const { data } = await api.post('/webhook/parsing/site/start')
+    return data
+  },
+  startTgParsing: async () => {
+    const { data } = await api.post('/webhook/parsing/tg/start')
+    return data
+  },
+  activateTimer: async () => {
+    const { data } = await api.post('/webhook/parsing/activate')
+    return data
+  },
+  deactivateTimer: async () => {
+    const { data } = await api.post('/webhook/parsing/deactivate')
+    return data
+  },
+  checkTimer: async () => {
+    const { data } = await api.get('/webhook/parsing/timer/check')
+    return data
+  }
 } 
