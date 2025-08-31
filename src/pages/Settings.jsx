@@ -44,6 +44,10 @@ export default function Settings() {
   const [confirmChannel, setConfirmChannel] = useState({ open: false, id: null, url: '' })
   const [message, setMessage] = useState(null)
   const [loadingSettings, setLoadingSettings] = useState(true)
+  const [parsingSiteDisabled, setParsingSiteDisabled] = useState(false)
+  const [parsingTgDisabled, setParsingTgDisabled] = useState(false)
+  const [siteParsingStatus, setSiteParsingStatus] = useState(false)
+  const [tgParsingStatus, setTgParsingStatus] = useState(false)
 
   // Рефы для автоматического изменения высоты textarea
   const promptRef = useAutoResizeTextarea(prompt)
@@ -84,6 +88,38 @@ export default function Settings() {
     }
   }, [])
 
+  // useEffect для отслеживания статуса парсинга каждые 5 секунд
+  useEffect(() => {
+    let canceled = false
+    
+    async function checkParsingStatus() {
+      try {
+        const [siteStatus, tgStatus] = await Promise.all([
+          ParsingAPI.getSiteParsingStatus(),
+          ParsingAPI.getTgParsingStatus()
+        ])
+        
+        if (!canceled) {
+          setSiteParsingStatus(siteStatus?.status === true)
+          setTgParsingStatus(tgStatus?.status === true)
+        }
+      } catch (e) {
+        console.error('Ошибка при проверке статуса парсинга:', e)
+      }
+    }
+
+    // Первая проверка сразу при загрузке
+    checkParsingStatus()
+    
+    // Устанавливаем интервал для проверки каждые 5 секунд
+    const interval = setInterval(checkParsingStatus, 5000)
+    
+    return () => {
+      canceled = true
+      clearInterval(interval)
+    }
+  }, [])
+
   // Функция для показа сообщений по центру экрана
   const showMessage = (text, type = 'success') => {
     setMessage(null)
@@ -105,7 +141,7 @@ export default function Settings() {
         SettingsAPI.setCountNewsParsing(countNewsParsing)
       ])
       showMessage('Все настройки успешно сохранены!')
-      setTimeout(() => navigate('/'), 800)
+      // Убрана строка с переходом на главную страницу
     } catch (e) {
       console.error(e)
       showMessage('Ошибка при сохранении настроек', 'error')
@@ -154,57 +190,95 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       {/* Панель управления парсингом */}
-      <div className="rounded-xl p-4 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="flex gap-2 w-full">
-          <button
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={loadingSettings || savingSettings}
-            onClick={async () => {
-              try {
-                const res = await ParsingAPI.startSiteParsing()
-                if (res?.status === 'close') {
-                  showMessage('Парсинг уже запущен', 'error')
-                } else if (res?.status === 'ok') {
-                  showMessage('Парсинг завершился')
-                } else {
-                  showMessage('Неожиданный ответ сервера', 'error')
+      <div className="rounded-xl p-4 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-col gap-4">
+        {/* Виджет статуса парсинга */}
+        {(siteParsingStatus || tgParsingStatus) && (
+          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+            <LoadingSpinner />
+            <div className="text-sm text-blue-700 dark:text-blue-300">
+              {siteParsingStatus && tgParsingStatus ? (
+                "Производится сбор данных с сайтов и TG каналов..."
+              ) : siteParsingStatus ? (
+                "Производится сбор данных с сайтов..."
+              ) : (
+                "Производится сбор данных с TG каналов..."
+              )}
+            </div>
+          </div>
+        )}
+        
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div className="flex gap-2 w-full">
+            <button
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loadingSettings || savingSettings || parsingSiteDisabled}
+              onClick={async () => {
+                setParsingSiteDisabled(true)
+                try {
+                  const res = await ParsingAPI.startSiteParsing()
+                  if (res?.status === 'close') {
+                    showMessage('Парсинг уже запущен', 'error')
+                  } else if (res?.status === 'ok') {
+                    showMessage('Парсинг завершился')
+                  } else if (res?.status === 'end') {
+                    showMessage('Лимит сбора новостей достигнут. Для сбора новых данных увеличьте значение в настройках.', 'error')
+                  } else {
+                    showMessage('Неожиданный ответ сервера', 'error')
+                  }
+                } catch (e) {
+                  console.error(e)
+                  showMessage('Ошибка запуска парсинга сайтов', 'error')
+                } finally {
+                  setParsingSiteDisabled(false)
                 }
-              } catch (e) {
-                console.error(e)
-                showMessage('Ошибка запуска парсинга сайтов', 'error')
-              }
-            }}
-          >
-            <BrowserChrome size={35} /> Парсинг сайтов
-          </button>
-          <button
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={loadingSettings || savingSettings}
-            onClick={async () => {
-              try {
-                const res = await ParsingAPI.startTgParsing()
-                if (res?.status === 'close') {
-                  showMessage('Парсинг уже запущен', 'error')
-                } else if (res?.status === 'ok') {
-                  showMessage('Парсинг завершился')
-                } else {
-                  showMessage('Неожиданный ответ сервера', 'error')
+              }}
+            >
+              {parsingSiteDisabled ? (
+                <LoadingSpinner />
+              ) : (
+                <BrowserChrome size={35} />
+              )}{' '}
+              Парсинг сайтов
+            </button>
+            <button
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loadingSettings || savingSettings || parsingTgDisabled}
+              onClick={async () => {
+                setParsingTgDisabled(true)
+                try {
+                  const res = await ParsingAPI.startTgParsing()
+                  if (res?.status === 'close') {
+                    showMessage('Парсинг уже запущен', 'error')
+                  } else if (res?.status === 'ok') {
+                    showMessage('Парсинг завершился')
+                  } else if (res?.status === 'end') {
+                    showMessage('Лимит сбора новостей достигнут. Для сбора новых данных увеличьте значение в настройках.', 'error')
+                  } else {
+                    showMessage('Неожиданный ответ сервера', 'error')
+                  }
+                } catch (e) {
+                  console.error(e)
+                  showMessage('Ошибка запуска парсинга Telegram', 'error')
+                } finally {
+                  setParsingTgDisabled(false)
                 }
-              } catch (e) {
-                console.error(e)
-                showMessage('Ошибка запуска парсинга Telegram', 'error')
-              }
-            }}
-          >
-            <Telegram size={35} /> Парсинг Telegram
-          </button>
-          
-        </div>
-        <div className="flex">
-          {/* Переключатель автопарсинга */}
-          <AutoParsingToggle loadingSettings={loadingSettings} />
+              }}
+            >
+              {parsingTgDisabled ? (
+                <LoadingSpinner />
+              ) : (
+                <Telegram size={35} />
+              )}{' '}
+              Парсинг Telegram
+            </button>
+          </div>
+          <div className="flex">
+            {/* Переключатель автопарсинга */}
+            <AutoParsingToggle loadingSettings={loadingSettings} />
+          </div>
         </div>
       </div>
+      
       {/* Центральное сообщение */}
       {message && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import PostCard from '../components/PostCard.jsx'
 import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
-import LoadingSpinner from '../components/LoadingSpinner'; // путь к вашему файлу
+import LoadingSpinner from '../components/LoadingSpinner';
 import { NewsAPI } from '../lib/api.js'
 import { ArrowRepeat, Openai, Plus } from 'react-bootstrap-icons'
 
@@ -13,7 +13,8 @@ export default function Home() {
 	const [confirm, setConfirm] = useState({ open: false, id: null, type: null })
 	const [promptModal, setPromptModal] = useState({ open: false, id: null, label: '', action: null })
 	const [message, setMessage] = useState(null)
-	const [requestInProgress, setRequestInProgress] = useState(false) // Новое состояние для отслеживания выполнения запроса
+	const [requestInProgress, setRequestInProgress] = useState(false)
+	const [refreshing, setRefreshing] = useState(false)
 
 	// Состояние для модального окна добавления новости
 	const [addNewsModal, setAddNewsModal] = useState({
@@ -24,27 +25,67 @@ export default function Home() {
 		imgPreview: null
 	})
 
+	// Функция для загрузки новостей
+	const fetchNews = async () => {
+		try {
+			const data = await NewsAPI.listNews()
+			setPosts(data || [])
+			setError('')
+		} catch (e) {
+			setError('Ошибка загрузки')
+			console.error('Ошибка при загрузке новостей:', e)
+		}
+	}
+
 	useEffect(() => {
 		let canceled = false
-		async function fetchData() {
+		const POLLING_INTERVAL = 5000 // 5 секунд
+
+		async function initialFetch() {
 			try {
 				setLoading(true)
 				const data = await NewsAPI.listNews()
-				if (!canceled) setPosts(data || [])
+				if (!canceled) {
+					setPosts(data || [])
+					setLoading(false)
+				}
 			} catch (e) {
 				if (!canceled) {
 					setError('Ошибка загрузки')
+					setLoading(false)
 					showMessage('Ошибка при загрузке новостей', 'error')
 				}
-			} finally {
-				if (!canceled) setLoading(false)
 			}
 		}
-		fetchData()
+
+		// Первоначальная загрузка
+		initialFetch()
+
+		// Настройка интервального обновления
+		const intervalId = setInterval(() => {
+			if (!canceled) {
+				fetchNews()
+			}
+		}, POLLING_INTERVAL)
+
 		return () => {
 			canceled = true
+			clearInterval(intervalId)
 		}
 	}, [])
+
+	// Функция для ручного обновления
+	const handleRefresh = async () => {
+		setRefreshing(true)
+		try {
+			await fetchNews()
+			showMessage('Новости обновлены')
+		} catch (e) {
+			showMessage('Ошибка при обновлении', 'error')
+		} finally {
+			setRefreshing(false)
+		}
+	}
 
 	// Функция для показа уведомлений
 	const showMessage = (text, type = 'success') => {
@@ -63,7 +104,7 @@ export default function Home() {
 	const [genPrompt, setGenPrompt] = useState('')
 
 	async function handleConfirm() {
-		setRequestInProgress(true) // Начало запроса
+		setRequestInProgress(true)
 		const { id, type } = confirm
 		try {
 			if (type === 'publish') {
@@ -74,8 +115,8 @@ export default function Home() {
 				await NewsAPI.deletePost(id)
 				showMessage('Новость успешно удалена!')
 			}
-			const data = await NewsAPI.listNews()
-			setPosts(data || [])
+			// Обновляем данные после действия
+			await fetchNews()
 		} catch (e) {
 			console.error(e)
 			const errorMessage = type === 'publish'
@@ -84,92 +125,7 @@ export default function Home() {
 			showMessage(errorMessage, 'error')
 		} finally {
 			setConfirm({ open: false, id: null, type: null })
-			setRequestInProgress(false) // Конец запроса
-		}
-	}
-
-	async function handlePromptModal(value) {
-		setRequestInProgress(true) // Начало запроса
-		const { id, action } = promptModal
-		try {
-			if (action === 'regen') {
-				await NewsAPI.reGeneratePost({ id, prompt: value })
-				showMessage('Новость успешно перегенерирована!')
-			}
-			const data = await NewsAPI.listNews()
-			setPosts(data || [])
-		} catch (e) {
-			console.error(e)
-			showMessage('Ошибка при перегенерации новости', 'error')
-		} finally {
-			setPromptModal({ open: false, id: null, label: '', action: null })
-			setRequestInProgress(false) // Конец запроса
-		}
-	}
-
-	async function handleGenerateNew() {
-		setRequestInProgress(true) // Начало запроса
-		try {
-			await NewsAPI.generatePost(genPrompt)
-			const data = await NewsAPI.listNews()
-			setPosts(data || [])
-			showMessage('Новость успешно сгенерирована!')
-		} catch (e) {
-			console.error(e)
-			showMessage('Ошибка при генерации новости', 'error')
-		} finally {
-			setGenOpen(false)
-			setGenPrompt('')
-			setRequestInProgress(false) // Конец запроса
-		}
-	}
-
-	const handleImageChange = (e) => {
-		const file = e.target.files[0];
-		if (file) {
-			const reader = new FileReader();
-			reader.onload = (e) => {
-				setAddNewsModal({
-					...addNewsModal,
-					imgFile: file,
-					imgPreview: e.target.result
-				});
-			};
-			reader.readAsDataURL(file);
-		}
-	};
-
-	const removeImage = () => {
-		setAddNewsModal({
-			...addNewsModal,
-			imgFile: null,
-			imgPreview: null
-		});
-	};
-
-	async function handleAddNew() {
-		setRequestInProgress(true) // Начало запроса
-		try {
-			const formData = new FormData();
-			formData.append('title', addNewsModal.title);
-			formData.append('text', addNewsModal.text);
-			if (addNewsModal.imgFile) {
-				formData.append('img', addNewsModal.imgFile);
-			}
-
-			await NewsAPI.addPost(formData);
-			const data = await NewsAPI.listNews();
-			setPosts(data || []);
-
-			showMessage('Новость успешно добавлена!');
-
-			// Закрываем модальное окно и сбрасываем поля
-			setAddNewsModal({ open: false, title: '', text: '', imgFile: null, imgPreview: null });
-		} catch (e) {
-			console.error(e);
-			showMessage('Ошибка при добавлении новости', 'error');
-		} finally {
-			setRequestInProgress(false) // Конец запроса
+			setRequestInProgress(false)
 		}
 	}
 
@@ -184,6 +140,18 @@ export default function Home() {
 
 	return (
 		<div>
+			{/* Кнопка ручного обновления */}
+			{/* <div className="flex justify-end mb-4">
+				<button
+					onClick={handleRefresh}
+					disabled={refreshing}
+					className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+				>
+					<ArrowRepeat className={refreshing ? 'animate-spin' : ''} />
+					{refreshing ? 'Обновление...' : 'Обновить'}
+				</button>
+			</div> */}
+
 			{/* Центральное сообщение */}
 			{message && (
 				<div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
@@ -224,12 +192,6 @@ export default function Home() {
 					</button>
 				</div>
 			</Modal>
-
-
-
-
-
-
 		</div>
 	)
 }

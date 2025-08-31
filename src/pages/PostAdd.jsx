@@ -95,35 +95,36 @@ export default function PostAdd() {
         }
     }
 
-    async function handleGenerateTitle() {
-        // Если заголовок пустой, используем текст с префиксом
-        const sourceText = newsData.title.trim() 
-            ? newsData.title 
-            : `Сгенерируй заголовок на основе этого текста: ${newsData.text.trim()}`;
-        
-        if (!sourceText.trim()) {
-            showMessage('Введите текст для генерации заголовка', 'error')
-            return
-        }
-
-        setGeneratingTitle(true)
-        try {
-            const generatedTitle = await NewsAPI.generatePostTitle(sourceText)
-
-            // Обрабатываем ответ от сервера
-            if (generatedTitle) {
-                handleChange('title', generatedTitle[0].output.title)
-                showMessage('Заголовок успешно сгенерирован!')
-            } else {
-                showMessage('Неверный формат ответа от сервера', 'error')
-            }
-        } catch (e) {
-            console.error(e)
-            showMessage('Ошибка при генерации заголовка', 'error')
-        } finally {
-            setGeneratingTitle(false)
-        }
+async function handleGenerateTitle() {
+    // Проверяем, что оба поля пустые
+    if (!newsData.title.trim() && !newsData.text.trim()) {
+        showMessage('Введите текст или заголовок для генерации', 'error');
+        return;
     }
+
+    // Если заголовок пустой, используем текст с префиксом
+    const sourceText = newsData.title.trim() 
+        ? newsData.title 
+        : `Сгенерируй заголовок на основе этого текста: ${newsData.text.trim()}`;
+    
+    setGeneratingTitle(true);
+    try {
+        const generatedTitle = await NewsAPI.generatePostTitle(sourceText);
+
+        // Обрабатываем ответ от сервера
+        if (generatedTitle) {
+            handleChange('title', generatedTitle[0].output.title);
+            showMessage('Заголовок успешно сгенерирован!');
+        } else {
+            showMessage('Неверный формат ответа от сервера', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showMessage('Ошибка при генерации заголовка', 'error');
+    } finally {
+        setGeneratingTitle(false);
+    }
+}
 
     async function handleGenerateText() {
         const sourceText = newsData.text.trim() || newsData.title.trim()

@@ -165,5 +165,13 @@ export const ParsingAPI = {
   checkTimer: async () => {
     const { data } = await api.get('/webhook/parsing/timer/check')
     return data
+  },
+  getTgParsingStatus: async () => {
+    const { data } = await api.get('/webhook/parsing/tg/status')
+    return data
+  },
+  getSiteParsingStatus: async () => {
+    const { data } = await api.get('/webhook/parsing/site/status')
+    return data
   }
 } 
