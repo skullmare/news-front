@@ -107,9 +107,14 @@ export default function PostDetail() {
 	async function handlePublish() {
 		setPublishing(true)
 		try {
-			await NewsAPI.publishPost(id)
-			showMessage('Новость успешно опубликована!')
-			navigate('/')
+			const response = await NewsAPI.publishPost(id)
+			if (response.error == 'not_publish') {
+				showMessage('Ошибка публикации! Содержание новости слишком длинное.', 'error')
+			} else {
+				showMessage('Новость успешно опубликована!')
+				navigate('/')
+			}
+			
 		} catch (e) {
 			console.error(e)
 			showMessage('Ошибка при публикации новости', 'error')
@@ -176,11 +181,21 @@ export default function PostDetail() {
 		setRegeneratingPhoto(true)
 		try {
 			const prompt = title + '. ' + text;
-			// Передаем только ID новости для перегенерации фото
-			await NewsAPI.reGeneratePhoto(id, prompt)
+			// Получаем полный ответ, чтобы иметь доступ к данным
+			const response = await NewsAPI.reGeneratePhoto(id, prompt)
+
+			// Проверяем тело ответа на наличие ошибки
+			if (response.error === "not_img") {
+				showMessage('Произошла ошибка при генерации изображения, попробуйте еще раз', 'error')
+				return
+			}
+			else {
+				showMessage('Изображение успешно перегенерировано!')
+			}
+
 			const data = await NewsAPI.getPost(id)
 			setPost(data)
-			showMessage('Изображение успешно перегенерировано!')
+
 		} catch (e) {
 			console.error(e)
 			showMessage('Ошибка при перегенерации изображения', 'error')

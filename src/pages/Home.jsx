@@ -108,8 +108,13 @@ export default function Home() {
 		const { id, type } = confirm
 		try {
 			if (type === 'publish') {
-				await NewsAPI.publishPost(id)
-				showMessage('Новость успешно опубликована!')
+				const response = await NewsAPI.publishPost(id)
+				if (response.error == 'not_publish') {
+					showMessage('Ошибка публикации! Содержание новости слишком длинное.', 'error')
+				} else {
+					showMessage('Новость успешно опубликована!')
+				}
+				
 			}
 			if (type === 'delete') {
 				await NewsAPI.deletePost(id)

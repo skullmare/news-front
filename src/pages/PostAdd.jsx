@@ -176,7 +176,10 @@ async function handleGenerateTitle() {
                 setFile(generatedFile)
                 setNewsData(prev => ({ ...prev, image: generatedFile }))
 
-            } else {
+            } else if (photoData.error === "not_img") {
+                showMessage('Произошла ошибка при генерации изображения, попробуйте еще раз', 'error')
+            }
+            else {
                 showMessage('Неверный формат ответа для изображения', 'error')
             }
         } catch (e) {
